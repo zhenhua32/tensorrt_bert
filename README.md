@@ -28,4 +28,10 @@ TODO: 这个属实难崩.
 
 # tensorflow 2.x 版本
 
+# ONNX
+
+[在 GPU 上使用 onnxruntime 的 bert 示例](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/python/tools/transformers/notebooks/PyTorch_Bert-Squad_OnnxRuntime_GPU.ipynb)
+
+
+
 
