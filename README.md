@@ -32,6 +32,14 @@ TODO: 这个属实难崩.
 
 [在 GPU 上使用 onnxruntime 的 bert 示例](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/python/tools/transformers/notebooks/PyTorch_Bert-Squad_OnnxRuntime_GPU.ipynb)
 
+总之, 应该先把模型导出成 ONNX 格式.
+
+tensorflow 可以使用 [tf2onnx](https://github.com/onnx/tensorflow-onnx).
+torch 可以使用自带的 [torch.onnx.export](https://pytorch.org/docs/stable/onnx.html#torch.onnx.export).
+
+# ONNX + tensorrt
+
+环境没装过, 可能比较复杂.
 
 
 
