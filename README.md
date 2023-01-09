@@ -37,9 +37,18 @@ TODO: 这个属实难崩.
 tensorflow 可以使用 [tf2onnx](https://github.com/onnx/tensorflow-onnx).
 torch 可以使用自带的 [torch.onnx.export](https://pytorch.org/docs/stable/onnx.html#torch.onnx.export).
 
+TODO: `torch.onnx.export` 可能很慢. 
+
 # ONNX + tensorrt
 
 环境没装过, 可能比较复杂.
 
+底层的代码用的是 NVIDIA 官方的 python 包 [tensorrt](https://github.com/NVIDIA/TensorRT).
+但不要信文档上写的 `pip install tensorrt`.
+API 文档参考这里 [tensorrt python api](https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/coreConcepts.html).
 
+这个 NVIDIA 官方的 github 仓库有个工具挺使用的. 转换 ONNX 模型到 trt 模型就是靠它.
+[Polygraphy](https://github.com/NVIDIA/TensorRT/tree/main/tools/Polygraphy/polygraphy/tools#converting-a-model-to-tensorrt)
 
+直接调用 tensorrt 的代码可能会有点复杂, 可以参考这个仓库, 做了一些封装.
+[transformer-deploy](https://github.com/ELS-RD/transformer-deploy/tree/v0.4.0)
