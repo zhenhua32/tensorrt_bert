@@ -67,11 +67,13 @@ def build_engine(
     config.max_workspace_size = max_workspace_size
 
     # BuilderFlag 有一堆设置, 但其他的还不是很了解
-    config.set_flag(trt.BuilderFlag.DISABLE_TIMING_CACHE)
+    # TODO: 使用 fp16 会让模型输出 nan
     if fp16:
         config.set_flag(trt.BuilderFlag.FP16)
     if int8:
         config.set_flag(trt.BuilderFlag.INT8)
+    config.set_flag(trt.BuilderFlag.DISABLE_TIMING_CACHE)
+    config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
 
     # 解析模型
     with open(onnx_file_path, "rb") as f:
