@@ -150,6 +150,8 @@ class ONNXTensorrtCompileModel(ONNXTensorrtModel):
 class ONNXTensorrtFp16Model(ONNXTensorrtModel):
     """
     试下 fp16 TODO: fp16 下还是各种输出 nan
+    https://github.com/NVIDIA/TensorRT/blob/main/samples/python/efficientdet/build_engine.py
+    有份代码, 可以先看一下
     """
 
     def __init__(self, use_fast_tokenizer=True):
