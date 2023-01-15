@@ -182,7 +182,7 @@ class ONNXTensorrtFp16Model(ONNXTensorrtModel):
         engine = trt_infer.build_engine(
             onnx_model_path,
             inputs=input_shapes,
-            max_workspace_size=1024 * 1024 * 1024 * 16,
+            max_workspace_size=1024 * 1024 * 1024 * 8,
             fp16=True,
         )
         self.model = trt_infer.Infer(engine)
