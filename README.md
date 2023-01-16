@@ -47,6 +47,8 @@ TODO: `torch.onnx.export` 可能很慢.
 但不要信文档上写的 `pip install tensorrt`.
 API 文档参考这里 [tensorrt python api](https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/coreConcepts.html).
 
+或许还真的能直接通过 pip 装, 可惜, 只有 linux 版本. [tensorrt pypi](https://pypi.org/project/tensorrt/8.5.2.2/#files)
+
 这个 NVIDIA 官方的 github 仓库有个工具挺使用的. 转换 ONNX 模型到 trt 模型就是靠它.
 [Polygraphy](https://github.com/NVIDIA/TensorRT/tree/main/tools/Polygraphy/polygraphy/tools#converting-a-model-to-tensorrt)
 
