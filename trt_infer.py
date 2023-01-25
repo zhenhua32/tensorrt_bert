@@ -40,10 +40,11 @@ class Input:
 
 
 def build_engine(
-    onnx_file_path: str, inputs: List[Input], max_workspace_size: int, fp16=False, int8=False
+    onnx_file_path: str, inputs: List[Input], max_workspace_size: int, fp16=False, int8=False, tf32=True
 ) -> ICudaEngine:
     """
     构建 trt engine
+    tf32 是默认开启的, 所以这里也是默认为 True
     """
     # Logger for the Builder, ICudaEngine and Runtime . 日志服务类
     trt_logger: Logger = trt.Logger(trt.Logger.ERROR)
@@ -72,8 +73,11 @@ def build_engine(
         config.set_flag(trt.BuilderFlag.FP16)
     if int8:
         config.set_flag(trt.BuilderFlag.INT8)
+    if not tf32:
+        config.clear_flag(trt.BuilderFlag.TF32)
     config.set_flag(trt.BuilderFlag.DISABLE_TIMING_CACHE)
-    config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
+    # config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
+    config.set_flag(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
 
     # 解析模型
     with open(onnx_file_path, "rb") as f:
@@ -91,6 +95,30 @@ def build_engine(
         )
     # 添加优化配置
     config.add_optimization_profile(profile)
+
+    """
+    TODO: 临时补丁, fp16 有些层会超出精度.
+    当前针对的是 BertForMaskedLM 的 "bert-base-uncased".
+    至于如何找出可能精度溢出的层, 可以试下 polygraphy 工具.
+    polygraphy 示例如下, 注意观察打印出来的日志, 里面有提示和告警, 最好每句话都读一下.
+    # 对比下两个框架的输出结果, trt 和 onnx
+    !polygraphy run ./onnx/model_torch.onnx --trt --validate --onnxrt --atol 1e-1 --rtol 1e-1 \
+    --fp16 \
+    --data-loader-script /workspace/examples/data_loader.py \
+    --trt-min-shapes input_ids:[1,128] attention_mask:[1,128] token_type_ids:[1,128] \
+    --trt-opt-shapes input_ids:[1,128] attention_mask:[1,128] token_type_ids:[1,128] \
+    --trt-max-shapes input_ids:[1,128] attention_mask:[1,128] token_type_ids:[1,128]
+    """
+    if fp16:
+        # 检查下所有的网络层
+        for i in range(network_def.num_layers):
+            layer = network_def.get_layer(i)
+            # 取消下行注释, 可以看到所有的层
+            # print(layer.name, "||||", layer.type)
+            if layer.name.startswith("/bert/Constant") or layer.name.startswith("(Unnamed Layer* 34)"):
+                # 设置该层的精度和输出类型
+                layer.precision = trt.DataType.FLOAT
+                layer.set_output_type(index=0, dtype=trt.DataType.FLOAT)
 
     # 真正开始构建网络
     trt_engine = builder.build_serialized_network(network_def, config)
