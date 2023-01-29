@@ -232,6 +232,58 @@ class ONNXTensorrtNotTf32Model(ONNXTensorrtModel):
         self.model = trt_infer.Infer(engine)
 
 
+class ONNXTensorrtDynamicModel(ONNXTensorrtModel):
+    """
+    动态 shape
+    """
+
+    def __init__(self, use_fast_tokenizer=True, fp16=False):
+        if use_fast_tokenizer:
+            self.enc = BertTokenizerFast.from_pretrained(bert_model_path)
+        else:
+            self.enc = BertTokenizer.from_pretrained(bert_model_path)
+
+        input_shapes = [
+            Input(
+                "input_ids",
+                min_shape=(1, 16),
+                opt_shape=(4, 128),
+                max_shape=(16, 512),
+            ),
+            Input(
+                "attention_mask",
+                min_shape=(1, 16),
+                opt_shape=(4, 128),
+                max_shape=(16, 512),
+            ),
+            Input(
+                "token_type_ids",
+                min_shape=(1, 16),
+                opt_shape=(4, 128),
+                max_shape=(16, 512),
+            ),
+        ]
+
+        engine = trt_infer.build_engine(
+            onnx_model_path,
+            inputs=input_shapes,
+            max_workspace_size=1024 * 1024 * 1024 * 8,
+            fp16=fp16,
+        )
+        self.model = trt_infer.Infer(engine)
+
+    def predict(self, texts: list, return_numpy=True, max_length=128):
+        # 输入的数据类型是 pt
+        inputs = self.enc(texts, return_tensors="pt", padding="max_length", max_length=max_length, truncation=True)
+        # 将输入转换成 int32
+        inputs = dict((k, v.to(torch.int32)) for k, v in inputs.items())
+        # 推理, 和其他模型的输出保持一致, 实际上可以 ["logits"] 获取输出
+        result = list(self.model.infer_tensorrt(inputs).values())
+        if return_numpy:
+            result = [x.cpu().numpy() for x in result]
+        return result
+
+
 def print_result(model_name, result, masked_sentences, pos_masks):
     """
     打印出模型预测的结果, 也就是推断出的 [MASK] 位置上的词
@@ -290,19 +342,46 @@ def print_stats(model_name, timings, batch_size):
     """
     print(msg)
 
+    return time_mean
 
-# trt_fp16_model = ONNXTensorrtFp16Model()
-# e = trt_fp16_model.predict(masked_sentences[:1])[0]
-# print("e:", e)
-# exit()
-# 准确性测试
-print("===========开始准确性测试")
+
+def show_confusion_matrix(data, img_file):
+    """
+    展示类似混淆矩阵的图
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    plt.figure(figsize=(8, 8))
+    sns.heatmap(data, annot=True, fmt="d", cmap="Blues")
+    plt.title("batch size and seq_len benchmark")
+    plt.xlabel("batch_size")
+    plt.ylabel("seq_len")
+    plt.xticks([0.5, 1.5, 2.5], [1, 4, 16])
+    plt.yticks([0.5, 1.5, 2.5], [16, 128, 512])
+    plt.show()
+    plt.savefig(img_file)
+
+
+start_time = timeit.default_timer()
+trt_dynamic_fp16_model = ONNXTensorrtDynamicModel(fp16=True)
+end_time = timeit.default_timer()
+print("编译模型耗时: {:.2f} s".format(end_time - start_time))
+i = trt_dynamic_fp16_model.predict(masked_sentences * 4, max_length=512)[0]
+exit()
+
 torch_model = TorchModel()
 onnx_model = ONNXModel()
 trt_model = ONNXTensorrtModel()
 trt_compile_model = ONNXTensorrtCompileModel()
 trt_fp16_model = ONNXTensorrtFp16Model()
 trt_not_tf32_model = ONNXTensorrtNotTf32Model()
+trt_dynamic_model = ONNXTensorrtDynamicModel()
+trt_dynamic_fp16_model = ONNXTensorrtDynamicModel(fp16=True)
+print("模型准备完成")
+
+# region 准确性测试
+print("===========开始准确性测试")
 
 a = torch_model.predict(masked_sentences[:1])[0]
 b = onnx_model.predict(masked_sentences[:1])[0]
@@ -310,6 +389,8 @@ c = trt_model.predict(masked_sentences[:1])[0]
 d = trt_compile_model.predict(masked_sentences[:1])[0]
 e = trt_fp16_model.predict(masked_sentences[:1])[0]
 f = trt_not_tf32_model.predict(masked_sentences[:1])[0]
+h = trt_dynamic_model.predict(masked_sentences[:1])[0]
+i = trt_dynamic_fp16_model.predict(masked_sentences[:1])[0]
 
 print("a:", a)
 print("b:", b)
@@ -317,6 +398,8 @@ print("c:", c)
 print("d:", d)
 print("e:", e)
 print("f:", f)
+print("h:", h)
+print("i:", i)
 
 print("在 1e-3 级别上")
 print("模型输出的一致性, a 和 b: ", np.allclose(a, b, rtol=1e-3, atol=1e-3))
@@ -324,6 +407,8 @@ print("模型输出的一致性, a 和 c: ", np.allclose(a, c, rtol=1e-3, atol=1
 print("模型输出的一致性, a 和 d: ", np.allclose(a, d, rtol=1e-3, atol=1e-3))
 print("模型输出的一致性, a 和 e: ", np.allclose(a, e, rtol=1e-3, atol=1e-3))
 print("模型输出的一致性, a 和 f: ", np.allclose(a, f, rtol=1e-3, atol=1e-3))
+print("模型输出的一致性, a 和 h: ", np.allclose(a, h, rtol=1e-3, atol=1e-3))
+print("模型输出的一致性, a 和 i: ", np.allclose(a, i, rtol=1e-3, atol=1e-3))
 
 print("模型预测的值")
 print_result("a", a, masked_sentences[:1], pos_masks[:1])
@@ -332,8 +417,11 @@ print_result("c", c, masked_sentences[:1], pos_masks[:1])
 print_result("d", d, masked_sentences[:1], pos_masks[:1])
 print_result("e", e, masked_sentences[:1], pos_masks[:1])
 print_result("f", f, masked_sentences[:1], pos_masks[:1])
+print_result("h", h, masked_sentences[:1], pos_masks[:1])
+print_result("i", i, masked_sentences[:1], pos_masks[:1])
+# endregion
 
-# 性能测试
+# region 性能测试
 print("===========开始性能测试")
 timings = time_graph(partial(torch_model.predict, masked_sentences[:1], False))
 print_stats("BERT Torch GPU", timings, 1)
@@ -352,3 +440,34 @@ print_stats("BERT ONNX TRT FP16 GPU", timings, 1)
 
 timings = time_graph(partial(trt_not_tf32_model.predict, masked_sentences[:1], False))
 print_stats("BERT ONNX TRT 不使用TF32 GPU", timings, 1)
+# endregion
+
+# 动态 shape 测试
+print("===========开始动态 shape 测试")
+# 按混淆矩阵那样存储, 行是 seq_length, 列是 batch_size
+matrix = []
+masked_sentences_16 = masked_sentences * 4
+for seq_length in [16, 128, 512]:
+    temp = []
+    for batch_size in [1, 4, 16]:
+        timings = time_graph(partial(trt_dynamic_model.predict, masked_sentences_16[:batch_size], False, seq_length))
+        title = f"BERT ONNX TRT 动态 shape GPU seq_length={seq_length}, batch_size={batch_size}"
+        time_mean = print_stats(title, timings, batch_size)
+        temp.append(time_mean)
+    matrix.append(temp)
+show_confusion_matrix(matrix, "动态shape性能.png")
+
+# 在 fp16 模式下测试动态 shape
+matrix = []
+masked_sentences_16 = masked_sentences * 4
+for seq_length in [16, 128, 512]:
+    temp = []
+    for batch_size in [1, 4, 16]:
+        timings = time_graph(
+            partial(trt_dynamic_fp16_model.predict, masked_sentences_16[:batch_size], False, seq_length)
+        )
+        title = f"BERT ONNX TRT 动态 shape GPU seq_length={seq_length}, batch_size={batch_size}"
+        time_mean = print_stats(title, timings, batch_size)
+        temp.append(time_mean)
+    matrix.append(temp)
+show_confusion_matrix(matrix, "动态shape性能_fp16.png")
