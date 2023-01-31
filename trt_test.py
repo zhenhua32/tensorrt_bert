@@ -358,8 +358,9 @@ def show_confusion_matrix(data, img_file):
     plt.title("batch size and seq_len benchmark")
     plt.xlabel("batch_size")
     plt.ylabel("seq_len")
+    # 这个坐标要和前面的代码对应起来
     plt.xticks([0.5, 1.5, 2.5], [1, 4, 16])
-    plt.yticks([0.5, 1.5, 2.5], [16, 128, 512])
+    plt.yticks([0.5, 1.5, 2.5], [16, 64, 256])
     # plt.show()
     plt.savefig(img_file)
 
@@ -450,6 +451,7 @@ def test_performance():
 
 def test_dynamic_shape_performance():
     """
+    TODO: 不太对, 这个动态 shape 性能好差, 原本的例子中 batch_size=1, seq=128 时只需要 5ms 以下, 现在 batch_size=1, seq=64 需要 40ms.
     这个测试对显卡要求过高, 只能拿出来单独测试
     """
     trt_dynamic_model = ONNXTensorrtDynamicModel()
